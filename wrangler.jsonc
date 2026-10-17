@@ -1,0 +1,10 @@
+// Ambiente DEV en Cloudflare: https://precios-dulce-canela.ailanquinteroh.workers.dev
+// Se publica con ./deploy-dev.sh
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "precios-dulce-canela",
+  "compatibility_date": "2026-10-06",
+  "assets": {
+    "directory": "dev-build"
+  }
+}

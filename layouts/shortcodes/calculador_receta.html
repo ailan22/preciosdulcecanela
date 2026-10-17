@@ -1,0 +1,67 @@
+<div class="dc-card" id="dc-receta">
+  <div class="dc-guardadas">
+    <label>Receta guardada
+      <select data-campo="guardadas"><option value="">— Nueva receta —</option></select>
+    </label>
+    <div class="dc-botones">
+      <button type="button" data-accion="guardar">Guardar</button>
+      <button type="button" data-accion="borrar" class="dc-sec">Borrar</button>
+    </div>
+  </div>
+
+  <div class="dc-controles">
+    <label class="dc-ancho">Nombre
+      <input type="text" data-campo="nombre" placeholder="Ej.: Cheesecake">
+    </label>
+    <label>Molde de la receta
+      <span class="dc-input-sufijo"><input type="number" min="1" step="1" value="18" data-campo="molde"><span>cm</span></span>
+    </label>
+    <label>Hacer en molde de
+      <span class="dc-input-sufijo"><input type="number" min="1" step="1" value="18" data-campo="destino"><span>cm</span></span>
+    </label>
+  </div>
+  <p class="dc-factor" aria-live="polite"></p>
+
+  <div class="dc-tabla-scroll">
+    <table class="dc-tabla dc-ingredientes">
+      <thead>
+        <tr>
+          <th>Ingrediente</th>
+          <th class="dc-num">Cantidad</th>
+          <th>Unidad</th>
+          <th class="dc-num">Paquete trae</th>
+          <th class="dc-num">Precio paquete</th>
+          <th class="dc-num">Usás</th>
+          <th class="dc-num">Costo</th>
+          <th><span class="dc-oculto">Quitar</span></th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <button type="button" data-accion="agregar" class="dc-sec">+ Agregar ingrediente</button>
+
+  <div class="dc-controles dc-extras">
+    <label>Caja y decoración
+      <span class="dc-input-prefijo"><span>$</span><input type="number" min="0" step="1" value="0" data-campo="caja"></span>
+    </label>
+    <label>Gas, luz y otros
+      <span class="dc-input-sufijo"><input type="number" min="0" step="1" value="10" data-campo="otros"><span>%</span></span>
+    </label>
+    <label>Ganancia
+      <span class="dc-input-sufijo"><input type="number" min="0" step="1" value="100" data-campo="ganancia"><span>%</span></span>
+    </label>
+    <label>Comparar con
+      <select data-campo="comparar"><option value="">— Ninguno —</option></select>
+    </label>
+  </div>
+
+  <dl class="dc-resumen">
+    <div><dt>Ingredientes</dt><dd data-res="ingredientes">$0</dd></div>
+    <div><dt>Gas, luz y otros</dt><dd data-res="otros">$0</dd></div>
+    <div><dt>Caja y decoración</dt><dd data-res="caja">$0</dd></div>
+    <div><dt>Costo total</dt><dd data-res="costo">$0</dd></div>
+    <div class="dc-destacado"><dt>Precio sugerido</dt><dd data-res="precio">$0</dd></div>
+  </dl>
+  <p class="dc-comparacion" aria-live="polite"></p>
+</div>

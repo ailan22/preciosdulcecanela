@@ -1,0 +1,477 @@
+/* Dulce Canela: paleta canela sobre el tema Hugo Scroll */
+:root {
+  --dc-canela: #a0612f;
+  --dc-canela-oscuro: #6e3f22;
+  --dc-crema: #fbf4ea;
+  --dc-crema-2: #f3e5d2;
+  --dc-chocolate: #3e2618;
+  --dc-borde: #e2cdb3;
+  --dc-alerta: #b3261e;
+
+  --cover-text-color: var(--dc-chocolate);
+  --highlight: var(--dc-canela);
+  --highlight-contrast: #fff;
+  --highlight-inverse: var(--dc-chocolate);
+  --highlight-inverse-contrast: #fff;
+  --cover-title-text-shadow: rgba(255, 255, 255, 0.6) 0 0 12px;
+  --sticky-menu-text-color: var(--dc-canela);
+
+  --section-light-text-color: var(--dc-chocolate);
+  --section-light-bg-color: var(--dc-crema);
+  --section-dark-text-color: var(--dc-crema);
+  --section-dark-bg-color: var(--dc-canela-oscuro);
+  --section-uni-code-bg-color: var(--dc-crema-2);
+
+  --footer-color-background: var(--dc-chocolate);
+  --footer-color: var(--dc-crema-2);
+
+  --ul-li-icon: fa-cookie-bite;
+}
+
+/* Portada sin foto: degradé canela con un toque de azúcar */
+#site-head.withCenteredImage {
+  background-color: var(--dc-crema-2);
+  background-image:
+    radial-gradient(circle at 20% 25%, rgba(255, 255, 255, 0.55) 0 2px, transparent 3px),
+    radial-gradient(circle at 75% 70%, rgba(255, 255, 255, 0.45) 0 2px, transparent 3px),
+    radial-gradient(ellipse at 50% 40%, #fff7ec 0%, #f1dcc0 45%, #d9a877 100%);
+  background-size: 38px 38px, 54px 54px, cover;
+  background-repeat: repeat, repeat, no-repeat;
+}
+
+#site-head .btn.site-menu {
+  border-radius: 999px;
+}
+
+/* ---------- Tarjeta de herramienta ---------- */
+.dc-card {
+  background: #fffdf9;
+  color: var(--dc-chocolate);
+  border: 1px solid var(--dc-borde);
+  border-radius: 14px;
+  padding: 1.25em;
+  margin: 1.6em 0;
+  box-shadow: 0 6px 24px rgba(62, 38, 24, 0.12);
+  font-size: 0.85em;
+  line-height: 1.4;
+}
+
+.dc-card label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3em;
+  font-size: 0.85em;
+  font-weight: 600;
+  color: var(--dc-canela-oscuro);
+}
+
+.dc-card input,
+.dc-card select {
+  font: inherit;
+  font-size: 1em;
+  font-weight: 400;
+  color: var(--dc-chocolate);
+  background: #fff;
+  border: 1px solid var(--dc-borde);
+  border-radius: 8px;
+  padding: 0.45em 0.6em;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.dc-card input:focus,
+.dc-card select:focus {
+  outline: 2px solid var(--dc-canela);
+  outline-offset: 1px;
+}
+
+.dc-card input[type="number"] {
+  text-align: right;
+}
+
+.dc-input-sufijo,
+.dc-input-prefijo {
+  display: flex;
+  align-items: center;
+  gap: 0.35em;
+  font-weight: 400;
+}
+
+.dc-input-sufijo > span,
+.dc-input-prefijo > span {
+  color: var(--dc-canela);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.dc-controles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.9em;
+  margin-bottom: 1em;
+}
+
+.dc-controles .dc-ancho {
+  grid-column: 1 / -1;
+}
+
+.dc-card button {
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 999px;
+  padding: 0.5em 1.1em;
+  border: 1px solid var(--dc-canela);
+  background: var(--dc-canela);
+  color: #fff;
+}
+
+.dc-card button:hover {
+  background: var(--dc-canela-oscuro);
+  border-color: var(--dc-canela-oscuro);
+}
+
+.dc-card button.dc-sec {
+  background: transparent;
+  color: var(--dc-canela-oscuro);
+}
+
+.dc-card button.dc-sec:hover {
+  background: var(--dc-crema-2);
+}
+
+/* ---------- Tablas ---------- */
+.dc-tabla-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.dc-card table.dc-tabla {
+  margin: 0 0 0.8em;
+  font-size: 0.95em;
+}
+
+.dc-card table.dc-tabla th,
+.dc-card table.dc-tabla td {
+  padding: 0.5em 0.6em;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.dc-card table.dc-tabla thead th {
+  border-bottom: 2px solid var(--dc-canela);
+  color: var(--dc-canela-oscuro);
+}
+
+.dc-card table.dc-tabla tbody > tr:nth-child(even) {
+  background: var(--dc-crema);
+}
+
+.dc-card table.dc-tabla tbody th {
+  font-weight: 600;
+}
+
+.dc-card .dc-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.dc-card td.dc-base {
+  background: var(--dc-crema-2);
+  font-weight: 700;
+  box-shadow: inset 3px 0 0 var(--dc-canela);
+}
+
+.dc-marca-base {
+  display: inline-block;
+  width: 0.9em;
+  height: 0.9em;
+  vertical-align: -0.1em;
+  background: var(--dc-crema-2);
+  box-shadow: inset 3px 0 0 var(--dc-canela);
+}
+
+.dc-marca-fijo {
+  color: var(--dc-canela);
+  font-weight: 700;
+  margin-left: 0.15em;
+}
+
+.dc-leyenda,
+.dc-factor {
+  font-size: 0.85em;
+  color: #7a5a44;
+  margin: 0 0 1em;
+}
+
+/* ---------- Calculador de receta ---------- */
+.dc-guardadas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.8em;
+  padding-bottom: 1em;
+  margin-bottom: 1em;
+  border-bottom: 1px dashed var(--dc-borde);
+}
+
+.dc-guardadas label {
+  flex: 1 1 200px;
+}
+
+.dc-botones {
+  display: flex;
+  gap: 0.5em;
+}
+
+.dc-ingredientes input,
+.dc-ingredientes select {
+  padding: 0.35em 0.45em;
+}
+
+.dc-ingredientes td:first-child input {
+  min-width: 9em;
+}
+
+.dc-ingredientes td.dc-num input {
+  width: 5.5em;
+}
+
+.dc-ingredientes select {
+  width: auto;
+}
+
+.dc-card button.dc-quitar {
+  background: transparent;
+  border: none;
+  color: #9b7a63;
+  font-size: 1.3em;
+  line-height: 1;
+  padding: 0.1em 0.4em;
+}
+
+.dc-card button.dc-quitar:hover {
+  color: var(--dc-alerta);
+  background: transparent;
+}
+
+.dc-extras {
+  margin-top: 1.4em;
+}
+
+.dc-resumen {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.6em;
+  margin: 0 0 0.8em;
+}
+
+.dc-resumen > div {
+  background: var(--dc-crema);
+  border-radius: 10px;
+  padding: 0.7em 0.9em;
+}
+
+.dc-resumen dt {
+  float: none;
+  width: auto;
+  text-align: left;
+  white-space: normal;
+  font-weight: 600;
+  font-size: 0.8em;
+  color: #7a5a44;
+}
+
+.dc-resumen dd {
+  margin: 0.15em 0 0;
+  padding: 0;
+  font-size: 1.25em;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.dc-resumen .dc-destacado {
+  background: var(--dc-canela);
+  color: #fff;
+}
+
+.dc-resumen .dc-destacado dt {
+  color: var(--dc-crema-2);
+}
+
+.dc-comparacion {
+  margin: 0;
+  font-weight: 600;
+  color: var(--dc-canela-oscuro);
+}
+
+.dc-comparacion.dc-alerta {
+  color: var(--dc-alerta);
+}
+
+.dc-oculto {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+/* En pantallas anchas las tarjetas se salen un poco de la columna de texto */
+@media (min-width: 1100px) {
+  .dc-card {
+    margin-left: -110px;
+    margin-right: -110px;
+  }
+}
+
+/* ---------- Celular: las tablas pasan a ser tarjetas ---------- */
+@media (max-width: 640px) {
+  .dc-card {
+    padding: 1em 0.85em;
+    margin-left: -4%;
+    margin-right: -4%;
+    border-radius: 12px;
+  }
+
+  /* 16px evita que el celular haga zoom al tocar un campo */
+  .dc-card input,
+  .dc-card select {
+    font-size: 16px;
+  }
+
+  .dc-controles {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.7em;
+  }
+
+  .dc-tabla-scroll {
+    overflow: visible;
+  }
+
+  .dc-card table.dc-tabla,
+  .dc-card table.dc-tabla tbody,
+  .dc-card table.dc-tabla tr,
+  .dc-card table.dc-tabla th,
+  .dc-card table.dc-tabla td {
+    display: block;
+    white-space: normal;
+  }
+
+  .dc-card table.dc-tabla thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  .dc-card table.dc-tabla tbody > tr,
+  .dc-card table.dc-tabla tbody > tr:nth-child(even) {
+    background: var(--dc-crema);
+    border-radius: 10px;
+    margin-bottom: 0.6em;
+  }
+
+  .dc-card td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 0.75em;
+    font-weight: 600;
+    color: #7a5a44;
+    margin-bottom: 0.15em;
+  }
+
+  /* Precios: una tarjeta por producto con sus medidas en fila */
+  #dc-precios tbody > tr {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    padding: 0.6em 0.4em 0.4em;
+  }
+
+  #dc-precios tbody th {
+    grid-column: 1 / -1;
+    padding: 0 0.3em 0.4em;
+    font-size: 1.05em;
+  }
+
+  #dc-precios td {
+    text-align: center;
+    padding: 0.35em 0.1em;
+    font-size: 0.92em;
+    border-radius: 6px;
+  }
+
+  .dc-card #dc-precios td.dc-base,
+  #dc-precios td.dc-base {
+    background: #fff;
+    box-shadow: inset 0 -3px 0 var(--dc-canela);
+  }
+
+  .dc-marca-base {
+    box-shadow: inset 0 -3px 0 var(--dc-canela);
+  }
+
+  /* Ingredientes: una tarjeta por ingrediente */
+  .dc-card table.dc-ingredientes tbody > tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5em 0.6em;
+    padding: 0.7em;
+    position: relative;
+  }
+
+  .dc-card .dc-ingredientes td {
+    padding: 0;
+    text-align: left;
+  }
+
+  .dc-ingredientes td.dc-celda-nombre {
+    grid-column: 1 / -1;
+    padding-right: 2.2em;
+  }
+
+  .dc-ingredientes td.dc-celda-nombre input {
+    min-width: 0;
+    font-weight: 600;
+  }
+
+  .dc-ingredientes td.dc-num input,
+  .dc-ingredientes select {
+    width: 100%;
+  }
+
+  .dc-ingredientes td.dc-calc {
+    font-weight: 700;
+    font-size: 1.05em;
+  }
+
+  .dc-ingredientes td.dc-celda-quitar {
+    position: absolute;
+    top: 0.55em;
+    right: 0.3em;
+  }
+
+  .dc-guardadas label {
+    flex-basis: 100%;
+  }
+
+  .dc-resumen {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .dc-resumen .dc-destacado {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 360px) {
+  .dc-controles {
+    grid-template-columns: 1fr;
+  }
+
+  #dc-precios td {
+    font-size: 0.82em;
+  }
+}

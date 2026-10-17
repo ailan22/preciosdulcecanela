@@ -1,0 +1,3 @@
+{{ with resources.Get "js/dulce-canela.js" | js.Build (dict "minify" true) | resources.Fingerprint }}
+<script src="{{ .RelPermalink }}" integrity="{{ .Data.Integrity }}"></script>
+{{ end }}

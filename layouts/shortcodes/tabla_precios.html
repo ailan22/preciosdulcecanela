@@ -1,0 +1,22 @@
+{{- $d := site.Data.precios -}}
+<div class="dc-card" id="dc-precios">
+  <script type="application/json" class="dc-datos">{{ $d | jsonify | safeJS }}</script>
+  <div class="dc-controles">
+    <label>Aumento general
+      <span class="dc-input-sufijo"><input type="number" step="1" value="0" data-campo="aumento" inputmode="decimal"><span>%</span></span>
+    </label>
+    <label>Recargo 14 cm
+      <span class="dc-input-sufijo"><input type="number" step="1" min="0" value="{{ mul $d.recargo_14 100 }}" data-campo="recargo"><span>%</span></span>
+    </label>
+    <label>Redondear a
+      <span class="dc-input-prefijo"><span>$</span><input type="number" step="1" min="1" value="{{ $d.redondeo }}" data-campo="redondeo"></span>
+    </label>
+  </div>
+  <div class="dc-tabla-scroll">
+    <table class="dc-tabla">
+      <thead><tr><th>Producto</th>{{ range $d.medidas }}<th class="dc-num">{{ . }} cm</th>{{ end }}</tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <p class="dc-leyenda"><span class="dc-marca-base"></span> medida base &nbsp;·&nbsp; <span class="dc-marca-fijo">*</span> precio fijo cargado a mano</p>
+</div>

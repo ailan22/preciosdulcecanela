@@ -1,0 +1,72 @@
+# Lista de precios de Dulce Canela (misma lógica que Lista_de_precios_tortas.xlsx)
+
+# Los precios se redondean a múltiplos de este valor ($)
+redondeo = 10
+# Recargo para la medida de 14 cm (0.1 = 10 %)
+recargo_14 = 0.1
+# Medidas (diámetro del molde, en cm)
+medidas = [14, 18, 20, 22, 24]
+
+# medida_base: diámetro (cm) al que corresponde precio_base
+# fijos: precios cargados a mano que reemplazan al cálculo, por medida
+[[productos]]
+nombre = "Cheesecake"
+medida_base = 18
+precio_base = 1200
+
+[[productos]]
+nombre = "Carrot cake"
+medida_base = 18
+precio_base = 890
+fijos = { "14" = 650, "18" = 990, "20" = 1320, "22" = 1480, "24" = 1590 }
+
+[[productos]]
+nombre = "Tiramisú"
+medida_base = 18
+precio_base = 1200
+
+[[productos]]
+nombre = "Lemon pie"
+medida_base = 18
+precio_base = 890
+
+[[productos]]
+nombre = "Massini"
+medida_base = 18
+precio_base = 890
+
+[[productos]]
+nombre = "Rogel"
+medida_base = 18
+precio_base = 1220
+
+[[productos]]
+nombre = "Chajá"
+medida_base = 18
+precio_base = 790
+
+[[productos]]
+nombre = "Torta de chocolate"
+medida_base = 20
+precio_base = 1650
+
+[[productos]]
+nombre = "Torta de frutilla o durazno"
+medida_base = 18
+precio_base = 890
+
+# Pendientes de "cambiar en la web.txt" (falta el precio base):
+# [[productos]]
+# nombre = "Tarta de dulce de leche y coco"
+# medida_base = 24
+# precio_base = 0
+#
+# [[productos]]
+# nombre = "Torta de ricotta y pasas"
+# medida_base = 24
+# precio_base = 0
+#
+# [[productos]]
+# nombre = "Pasta frola"
+# medida_base = 24
+# precio_base = 0
