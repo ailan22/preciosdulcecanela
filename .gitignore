@@ -4,3 +4,4 @@ resources/_gen/
 /dev-build/
 /.wrangler/
 /db/*.db
+/.dev.vars

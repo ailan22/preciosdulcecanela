@@ -225,6 +225,33 @@
   gap: 0.5em;
 }
 
+.dc-estado-recetas {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 0.85em;
+  color: #7a5a44;
+}
+
+.dc-estado-recetas:empty {
+  display: none;
+}
+
+.dc-estado-recetas.dc-alerta {
+  color: var(--dc-alerta);
+}
+
+.dc-clave {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.8em;
+}
+
+.dc-clave[hidden] {
+  display: none;
+}
+
 .dc-ingredientes input,
 .dc-ingredientes select {
   padding: 0.35em 0.45em;

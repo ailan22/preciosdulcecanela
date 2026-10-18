@@ -10,6 +10,7 @@ Escribí el ingrediente y elegilo de la lista: el precio y el tamaño del
 paquete se completan solos con la lista de insumos. Si no está, cargá lo
 que pagás por el paquete.
 Si la receta es para un molde y querés hacerla en otro, elegí la medida y
-las cantidades se ajustan solas. Las recetas se guardan en este navegador.
+las cantidades se ajustan solas. Con la clave de recetas, lo que guardás
+queda en la base de datos y lo ves desde cualquier dispositivo.
 
 {{< calculador_receta >}}

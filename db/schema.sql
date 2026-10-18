@@ -3,6 +3,8 @@
 
 PRAGMA foreign_keys = ON;
 
+DROP TABLE IF EXISTS receta_ingredientes;
+DROP TABLE IF EXISTS recetas;
 DROP VIEW IF EXISTS v_insumos;
 DROP TRIGGER IF EXISTS insumos_historial;
 DROP TABLE IF EXISTS historial_precios;
@@ -63,3 +65,33 @@ SELECT
   i.actualizado
 FROM insumos i
 JOIN categorias c ON c.id = i.categoria_id;
+
+-- Recetas guardadas desde el calculador del sitio (las escribe worker/index.js).
+CREATE TABLE recetas (
+  id           INTEGER PRIMARY KEY,
+  nombre       TEXT    NOT NULL UNIQUE COLLATE NOCASE,
+  molde_cm     REAL    NOT NULL DEFAULT 18,
+  destino_cm   REAL    NOT NULL DEFAULT 18,
+  caja         REAL    NOT NULL DEFAULT 0,
+  otros_pct    REAL    NOT NULL DEFAULT 10,
+  ganancia_pct REAL    NOT NULL DEFAULT 100,
+  comparar_con TEXT,
+  creada       TEXT    NOT NULL DEFAULT (datetime('now')),
+  actualizada  TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
+-- insumo_id enlaza con la lista de insumos cuando el nombre coincide;
+-- paquete y precio guardan lo cargado a mano para los que no están en la lista.
+CREATE TABLE receta_ingredientes (
+  id        INTEGER PRIMARY KEY,
+  receta_id INTEGER NOT NULL REFERENCES recetas(id) ON DELETE CASCADE,
+  orden     INTEGER NOT NULL,
+  nombre    TEXT    NOT NULL,
+  insumo_id INTEGER REFERENCES insumos(id) ON DELETE SET NULL,
+  cantidad  REAL,
+  unidad    TEXT    NOT NULL DEFAULT 'g' CHECK (unidad IN ('g', 'ml', 'u')),
+  paquete   REAL,
+  precio    REAL
+);
+
+CREATE INDEX receta_ingredientes_receta ON receta_ingredientes(receta_id, orden);

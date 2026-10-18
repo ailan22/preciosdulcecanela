@@ -2,6 +2,7 @@
 
 const CLAVE_RECETAS = "dulce-canela-recetas";
 const CLAVE_BORRADOR = "dulce-canela-borrador";
+const CLAVE_ACCESO = "dulce-canela-clave";
 const UNIDADES = ["g", "ml", "u"];
 
 const moneda = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 0 });
@@ -117,7 +118,7 @@ function crearReceta(raiz, precios) {
   usarInsumos(datosInsumos ? JSON.parse(datosInsumos.textContent) || [] : []);
 
   if (precios) {
-    precios.productos.forEach((p, i) => comparar.add(new Option(p.nombre, i)));
+    precios.productos.forEach((p) => comparar.add(new Option(p.nombre, p.nombre)));
   } else {
     comparar.closest("label").hidden = true;
   }
@@ -209,7 +210,7 @@ function crearReceta(raiz, precios) {
     res("precio").textContent = pesos(sugerido);
 
     const comp = raiz.querySelector(".dc-comparacion");
-    const prod = precios && e.comparar !== "" ? precios.productos[e.comparar] : null;
+    const prod = precios && e.comparar ? precios.productos.find((p) => p.nombre === e.comparar) : null;
     if (prod && e.destino > 0) {
       const lista = precios.precio(prod, e.destino);
       const ganancia = lista - costo;
@@ -224,8 +225,66 @@ function crearReceta(raiz, precios) {
     escribir(CLAVE_BORRADOR, e);
   }
 
+  // ----- Recetas guardadas: en la base D1 si hay clave, si no en este navegador -----
+
+  const estadoRecetas = raiz.querySelector(".dc-estado-recetas");
+  const formClave = raiz.querySelector(".dc-clave");
+  let recetas = leer(CLAVE_RECETAS, {});
+  let enBase = false;
+
+  function avisar(texto, alerta = false) {
+    estadoRecetas.textContent = texto;
+    estadoRecetas.classList.toggle("dc-alerta", alerta);
+  }
+
+  async function api(metodo, nombre = "", datos) {
+    const r = await fetch("/api/recetas" + (nombre ? "/" + encodeURIComponent(nombre) : ""), {
+      method: metodo,
+      headers: { "X-Clave": leer(CLAVE_ACCESO, ""), ...(datos ? { "Content-Type": "application/json" } : {}) },
+      body: datos ? JSON.stringify(datos) : undefined,
+    });
+    if (!r.ok) throw r.status;
+    return r.status === 204 ? null : r.json();
+  }
+
+  async function traerDeBase() {
+    const lista = await api("GET");
+    recetas = Object.fromEntries(lista.map((r) => [r.nombre, r]));
+  }
+
+  async function conectar(claveNueva = false) {
+    try {
+      await traerDeBase();
+    } catch (status) {
+      enBase = false;
+      formClave.hidden = status !== 401;
+      if (status === 401) {
+        avisar(claveNueva
+          ? "Clave incorrecta."
+          : "Las recetas se guardan solo en este navegador. Ingresá la clave para guardarlas en la base.", claveNueva);
+      }
+      // Sin API (por ejemplo con hugo server) se sigue usando este navegador
+      return;
+    }
+    enBase = true;
+    formClave.hidden = true;
+
+    // Sube las recetas que estaban guardadas solo en este navegador
+    const locales = Object.entries(leer(CLAVE_RECETAS, {})).filter(([n]) => !recetas[n]);
+    try {
+      for (const [n, r] of locales) await api("PUT", n, r);
+      if (locales.length) await traerDeBase();
+      escribir(CLAVE_RECETAS, {});
+      avisar(locales.length
+        ? `Las recetas se guardan en la base de datos (${locales.length === 1 ? "se subió 1 receta" : `se subieron ${locales.length} recetas`} de este navegador).`
+        : "Las recetas se guardan en la base de datos.");
+    } catch (status) {
+      avisar("No se pudieron subir las recetas de este navegador; siguen guardadas acá.", true);
+    }
+    listarGuardadas(guardadas.value);
+  }
+
   function listarGuardadas(seleccion = "") {
-    const recetas = leer(CLAVE_RECETAS, {});
     guardadas.length = 1;
     Object.keys(recetas).sort((a, b) => a.localeCompare(b, "es")).forEach((n) => guardadas.add(new Option(n, n)));
     guardadas.value = seleccion;
@@ -240,14 +299,20 @@ function crearReceta(raiz, precios) {
   });
   raiz.addEventListener("change", (ev) => {
     if (ev.target === guardadas) {
-      const recetas = leer(CLAVE_RECETAS, {});
       cargar(guardadas.value ? recetas[guardadas.value] : {});
     } else {
       calcular();
     }
   });
 
-  raiz.addEventListener("click", (ev) => {
+  formClave.addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    escribir(CLAVE_ACCESO, campo("clave").value);
+    campo("clave").value = "";
+    conectar(true);
+  });
+
+  raiz.addEventListener("click", async (ev) => {
     const boton = ev.target.closest("[data-accion]");
     if (!boton) return;
     const accion = boton.dataset.accion;
@@ -265,14 +330,38 @@ function crearReceta(raiz, precios) {
         campo("nombre").focus();
         return;
       }
-      const recetas = leer(CLAVE_RECETAS, {});
-      recetas[e.nombre] = e;
-      escribir(CLAVE_RECETAS, recetas);
-      listarGuardadas(e.nombre);
+      if (enBase) {
+        try {
+          await api("PUT", e.nombre, e);
+          await traerDeBase();
+        } catch (status) {
+          avisar(`No se pudo guardar "${e.nombre}" en la base (error ${status}). Probá de nuevo.`, true);
+          return;
+        }
+        avisar(`"${e.nombre}" guardada en la base de datos.`);
+      } else {
+        recetas[e.nombre] = e;
+        escribir(CLAVE_RECETAS, recetas);
+      }
+      // La base no distingue mayúsculas: se selecciona el nombre tal como quedó guardado
+      const guardada = Object.keys(recetas).find((n) => n.toLowerCase() === e.nombre.toLowerCase());
+      listarGuardadas(guardada || e.nombre);
     } else if (accion === "borrar") {
-      const recetas = leer(CLAVE_RECETAS, {});
-      delete recetas[guardadas.value];
-      escribir(CLAVE_RECETAS, recetas);
+      const nombre = guardadas.value;
+      if (!nombre) return;
+      if (enBase) {
+        try {
+          await api("DELETE", nombre);
+          await traerDeBase();
+        } catch (status) {
+          avisar(`No se pudo borrar "${nombre}" de la base (error ${status}).`, true);
+          return;
+        }
+        avisar(`"${nombre}" borrada de la base de datos.`);
+      } else {
+        delete recetas[nombre];
+        escribir(CLAVE_RECETAS, recetas);
+      }
       listarGuardadas();
       cargar({});
     }
@@ -281,8 +370,9 @@ function crearReceta(raiz, precios) {
   if (precios) precios.alCambiar(calcular);
 
   const borrador = leer(CLAVE_BORRADOR, null);
-  listarGuardadas(borrador && leer(CLAVE_RECETAS, {})[borrador.nombre] ? borrador.nombre : "");
+  listarGuardadas(borrador && recetas[borrador.nombre] ? borrador.nombre : "");
   cargar(borrador || {});
+  conectar();
 
   // Precios vigentes desde la base D1; si no responde, queda la copia de la página
   fetch("/api/insumos")
