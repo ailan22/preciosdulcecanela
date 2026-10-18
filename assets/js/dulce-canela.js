@@ -101,12 +101,20 @@ function crearReceta(raiz, precios) {
   const guardadas = campo("guardadas");
   const comparar = campo("comparar");
 
-  // Insumos de la base (db/), exportados a data/insumos.json
+  // Insumos: copia incluida en la página (data/insumos.json) hasta que responde la base D1
   const datosInsumos = raiz.querySelector(".dc-insumos");
-  const insumos = new Map(
-    (datosInsumos ? JSON.parse(datosInsumos.textContent) || [] : []).map((i) => [i.nombre.toLowerCase(), i])
-  );
+  let insumos = new Map();
   const buscarInsumo = (nombre) => insumos.get(String(nombre || "").trim().toLowerCase());
+
+  function usarInsumos(lista) {
+    insumos = new Map(lista.map((i) => [i.nombre.toLowerCase(), i]));
+    const opciones = raiz.querySelector("#dc-lista-insumos");
+    if (opciones) {
+      opciones.replaceChildren(...lista.map((i) =>
+        new Option(`${i.categoria} · ${pesos(i.precio)} por ${cantidad.format(i.paquete)} ${i.unidad}`, i.nombre)));
+    }
+  }
+  usarInsumos(datosInsumos ? JSON.parse(datosInsumos.textContent) || [] : []);
 
   if (precios) {
     precios.productos.forEach((p, i) => comparar.add(new Option(p.nombre, i)));
@@ -275,6 +283,20 @@ function crearReceta(raiz, precios) {
   const borrador = leer(CLAVE_BORRADOR, null);
   listarGuardadas(borrador && leer(CLAVE_RECETAS, {})[borrador.nombre] ? borrador.nombre : "");
   cargar(borrador || {});
+
+  // Precios vigentes desde la base D1; si no responde, queda la copia de la página
+  fetch("/api/insumos")
+    .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+    .then((lista) => {
+      if (!Array.isArray(lista) || !lista.length) return;
+      usarInsumos(lista);
+      for (const fila of cuerpo.rows) {
+        const insumo = buscarInsumo(fila.querySelector('[data-ing="nombre"]').value);
+        if (insumo) aplicarInsumo(fila, insumo);
+      }
+      calcular();
+    })
+    .catch(() => {});
 }
 
 document.addEventListener("DOMContentLoaded", () => {

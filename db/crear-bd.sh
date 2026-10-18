@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Crea (o recrea desde cero) la base local db/dulce_canela.db
-# y regenera data/insumos.json para el sitio.
+# y regenera data/insumos.json. Ojo: los precios vigentes están en D1 (dulce-canela);
+# esto es para trabajar en local o para recargar D1 desde cero.
 # Uso: ./db/crear-bd.sh
 set -euo pipefail
 cd "$(dirname "$0")"
