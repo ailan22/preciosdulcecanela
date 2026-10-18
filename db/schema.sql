@@ -3,11 +3,11 @@
 
 PRAGMA foreign_keys = ON;
 
-DROP VIEW IF EXISTS v_ventas_diarias;
-DROP TABLE IF EXISTS ventas;
 DROP VIEW IF EXISTS v_stock;
 DROP TABLE IF EXISTS movimientos_stock;
 DROP TABLE IF EXISTS operaciones_stock;
+DROP VIEW IF EXISTS v_ventas_diarias;
+DROP TABLE IF EXISTS ventas;
 DROP TABLE IF EXISTS receta_ingredientes;
 DROP TABLE IF EXISTS recetas;
 DROP VIEW IF EXISTS v_insumos;
@@ -101,15 +101,47 @@ CREATE TABLE receta_ingredientes (
 
 CREATE INDEX receta_ingredientes_receta ON receta_ingredientes(receta_id, orden);
 
--- Stock: cada compra, receta hecha o conteo es una operación con sus movimientos.
+-- Ventas: fecha es el día local (AAAA-MM-DD). costo_unitario se estima al registrar
+-- con la receta del mismo nombre y los precios de ese momento; NULL si no hay receta.
+CREATE TABLE ventas (
+  id              INTEGER PRIMARY KEY,
+  fecha           TEXT    NOT NULL,
+  producto        TEXT    NOT NULL,
+  medida_cm       REAL,
+  cantidad        REAL    NOT NULL DEFAULT 1 CHECK (cantidad > 0),
+  precio_unitario REAL    NOT NULL CHECK (precio_unitario >= 0),
+  costo_unitario  REAL,
+  receta_id       INTEGER REFERENCES recetas(id) ON DELETE SET NULL,
+  nota            TEXT,
+  creada          TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX ventas_fecha ON ventas(fecha);
+
+-- Totales por día (costo y ganancia solo suman las ventas con costo estimado).
+CREATE VIEW v_ventas_diarias AS
+SELECT
+  fecha,
+  sum(cantidad) AS unidades,
+  sum(cantidad * precio_unitario) AS total,
+  sum(cantidad * costo_unitario) AS costo,
+  sum(cantidad * (precio_unitario - costo_unitario)) AS ganancia
+FROM ventas
+GROUP BY fecha;
+
+-- Stock: cada compra, receta hecha, venta o conteo es una operación con sus movimientos.
 -- El stock de un insumo es la suma de sus movimientos; borrar la operación la deshace.
 CREATE TABLE operaciones_stock (
   id        INTEGER PRIMARY KEY,
   tipo      TEXT    NOT NULL CHECK (tipo IN ('compra', 'produccion', 'ajuste')),
   fecha     TEXT    NOT NULL DEFAULT (datetime('now')),
   detalle   TEXT    NOT NULL,
-  receta_id INTEGER REFERENCES recetas(id) ON DELETE SET NULL
+  receta_id INTEGER REFERENCES recetas(id) ON DELETE SET NULL,
+  -- Si la generó una venta: al borrar la venta se deshace sola
+  venta_id  INTEGER REFERENCES ventas(id) ON DELETE CASCADE
 );
+
+CREATE INDEX operaciones_stock_venta ON operaciones_stock(venta_id);
 
 -- cantidad en la unidad del insumo: positiva entra, negativa sale.
 CREATE TABLE movimientos_stock (
@@ -138,30 +170,3 @@ JOIN categorias c ON c.id = i.categoria_id
 LEFT JOIN movimientos_stock m ON m.insumo_id = i.id
 GROUP BY i.id;
 
--- Ventas: fecha es el día local (AAAA-MM-DD). costo_unitario se estima al registrar
--- con la receta del mismo nombre y los precios de ese momento; NULL si no hay receta.
-CREATE TABLE ventas (
-  id              INTEGER PRIMARY KEY,
-  fecha           TEXT    NOT NULL,
-  producto        TEXT    NOT NULL,
-  medida_cm       REAL,
-  cantidad        REAL    NOT NULL DEFAULT 1 CHECK (cantidad > 0),
-  precio_unitario REAL    NOT NULL CHECK (precio_unitario >= 0),
-  costo_unitario  REAL,
-  receta_id       INTEGER REFERENCES recetas(id) ON DELETE SET NULL,
-  nota            TEXT,
-  creada          TEXT    NOT NULL DEFAULT (datetime('now'))
-);
-
-CREATE INDEX ventas_fecha ON ventas(fecha);
-
--- Totales por día (costo y ganancia solo suman las ventas con costo estimado).
-CREATE VIEW v_ventas_diarias AS
-SELECT
-  fecha,
-  sum(cantidad) AS unidades,
-  sum(cantidad * precio_unitario) AS total,
-  sum(cantidad * costo_unitario) AS costo,
-  sum(cantidad * (precio_unitario - costo_unitario)) AS ganancia
-FROM ventas
-GROUP BY fecha;

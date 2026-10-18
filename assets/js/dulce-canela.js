@@ -482,7 +482,7 @@ function crearStock(raiz) {
       const fila = cuerpo.insertRow();
       // La base guarda la fecha en UTC
       celda(fila, fechaCorta.format(new Date(op.fecha.replace(" ", "T") + "Z")), "Fecha");
-      celda(fila, TIPOS_OPERACION[op.tipo] || op.tipo, "Qué");
+      celda(fila, op.venta_id ? "Venta" : TIPOS_OPERACION[op.tipo] || op.tipo, "Qué");
       const detalle = celda(fila, op.detalle, "Detalle", "dc-detalle");
       if (op.tipo === "produccion" && op.movimientos.length) {
         const lista = document.createElement("small");
@@ -627,6 +627,7 @@ function crearStock(raiz) {
 
   formularioClave(formClave, cargar);
   document.addEventListener("dc-recetas", () => cargar());
+  document.addEventListener("dc-ventas", () => cargar());
   cargar();
 }
 
@@ -658,10 +659,14 @@ function crearVentas(raiz, precios) {
     estado.classList.toggle("dc-alerta", alerta);
   }
 
-  function mostrarResultado(texto, alerta = false) {
-    resultado.replaceChildren(Object.assign(document.createElement("p"), { textContent: texto }));
+  function mostrarResultado(texto, alerta = false, omitidos = []) {
+    const lineas = [texto, omitidos.length ? `No se descontaron del stock: ${omitidos.join(", ")}.` : ""].filter(Boolean);
+    resultado.replaceChildren(...lineas.map((l) => Object.assign(document.createElement("p"), { textContent: l })));
     resultado.classList.toggle("dc-alerta", alerta);
   }
+
+  // Las ventas descuentan stock: la sección de stock se actualiza
+  const ventasCambiaron = () => document.dispatchEvent(new Event("dc-ventas"));
 
   function celda(fila, texto, etiqueta, clase = "") {
     const td = fila.insertCell();
@@ -781,7 +786,8 @@ function crearVentas(raiz, precios) {
     enviar.disabled = true;
     try {
       const r = await api("ventas", "POST", Object.fromEntries(new FormData(form)));
-      mostrarResultado(r.mensaje);
+      mostrarResultado(r.mensaje, false, r.omitidos || []);
+      ventasCambiaron();
       // Quedan fecha y medida para cargar seguido varias ventas del mismo día
       for (const n of ["producto", "precio", "nota"]) form.elements[n].value = "";
       form.elements.cantidad.value = 1;
@@ -809,7 +815,8 @@ function crearVentas(raiz, precios) {
     boton.disabled = true;
     try {
       await api(`ventas/${boton.dataset.borrar}`, "DELETE");
-      mostrarResultado("Venta borrada.");
+      mostrarResultado("Venta borrada; sus ingredientes volvieron al stock.");
+      ventasCambiaron();
     } catch (e) {
       mostrarResultado(`No se pudo borrar (${e.message}).`, true);
     }

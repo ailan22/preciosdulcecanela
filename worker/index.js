@@ -9,8 +9,8 @@
 //   POST   /api/stock/ajuste             corrige el stock con lo que se contó (requiere clave)
 //   DELETE /api/stock/operaciones/:id    deshace una operación               (requiere clave)
 //   GET    /api/ventas?desde=&hasta=     ventas y totales por día del período (requiere clave)
-//   POST   /api/ventas                   registra una venta                  (requiere clave)
-//   DELETE /api/ventas/:id               borra una venta                     (requiere clave)
+//   POST   /api/ventas                   registra una venta y descuenta su receta del stock (requiere clave)
+//   DELETE /api/ventas/:id               borra una venta y devuelve el stock  (requiere clave)
 // La clave se manda en el encabezado X-Clave y se compara con el secreto CLAVE_RECETAS.
 
 const CONSULTA_INSUMOS = `
@@ -126,12 +126,15 @@ async function apiRecetas(request, env, ruta) {
 const MAX_OPERACIONES = 30;
 const formato = new Intl.NumberFormat("es-UY", { maximumFractionDigits: 1 });
 
-// Inserta la operación y sus movimientos en una sola transacción.
-// D1 ejecuta el batch en serie, así que max(id) es la operación recién creada.
-function operacion(env, tipo, detalle, recetaId, movimientos) {
+// Consultas para insertar la operación y sus movimientos (van en un batch = una transacción).
+// D1 ejecuta el batch en serie, así que max(id) es la fila recién creada; con deVenta la
+// operación queda enlazada a la venta insertada antes en el mismo batch.
+function operacion(env, tipo, detalle, recetaId, movimientos, deVenta = false) {
   return [
-    env.DB.prepare("INSERT INTO operaciones_stock (tipo, detalle, receta_id) VALUES (?1, ?2, ?3)")
-      .bind(tipo, detalle, recetaId ?? null),
+    env.DB.prepare(`
+      INSERT INTO operaciones_stock (tipo, detalle, receta_id, venta_id)
+      VALUES (?1, ?2, ?3, CASE WHEN ?4 THEN (SELECT max(id) FROM ventas) END)`
+    ).bind(tipo, detalle, recetaId ?? null, deVenta ? 1 : 0),
     ...movimientos.map((m) => env.DB.prepare(`
       INSERT INTO movimientos_stock (operacion_id, insumo_id, cantidad)
       VALUES ((SELECT max(id) FROM operaciones_stock), ?1, ?2)`
@@ -146,7 +149,7 @@ const buscarInsumo = (env, nombre) => env.DB.prepare(
 async function verStock(env) {
   const [insumos, operaciones, movimientos] = await env.DB.batch([
     env.DB.prepare("SELECT * FROM v_stock ORDER BY nombre COLLATE NOCASE"),
-    env.DB.prepare("SELECT id, tipo, fecha, detalle FROM operaciones_stock ORDER BY id DESC LIMIT ?1").bind(MAX_OPERACIONES),
+    env.DB.prepare("SELECT id, tipo, fecha, detalle, venta_id FROM operaciones_stock ORDER BY id DESC LIMIT ?1").bind(MAX_OPERACIONES),
     env.DB.prepare(`
       SELECT m.operacion_id, i.nombre, m.cantidad, i.unidad
       FROM movimientos_stock m JOIN insumos i ON i.id = m.insumo_id
@@ -199,6 +202,35 @@ async function ajuste(env, datos) {
   });
 }
 
+// Ingredientes de una receta con su insumo: se enlaza por insumo_id o, si el insumo
+// se agregó a la lista después, por nombre
+async function ingredientesReceta(env, recetaId) {
+  const { results } = await env.DB.prepare(`
+    SELECT ri.nombre, ri.cantidad, ri.unidad, ri.paquete, ri.precio,
+           i.id AS insumo_id, i.unidad AS unidad_insumo,
+           i.cantidad_paquete AS paquete_insumo, i.precio_paquete AS precio_insumo
+    FROM receta_ingredientes ri
+    LEFT JOIN insumos i ON i.id = coalesce(ri.insumo_id, (SELECT id FROM insumos WHERE nombre = ri.nombre))
+    WHERE ri.receta_id = ?1
+    ORDER BY ri.orden`).bind(recetaId).all();
+  return results;
+}
+
+// Movimientos que descuentan los ingredientes multiplicados por factor
+function descuentos(ingredientes, factor) {
+  const movimientos = [];
+  const omitidos = [];
+  for (const ing of ingredientes) {
+    if (!ing.insumo_id) omitidos.push(`${ing.nombre} (no está en la lista de insumos)`);
+    else if (!(ing.cantidad > 0)) omitidos.push(`${ing.nombre} (sin cantidad)`);
+    else if (ing.unidad !== ing.unidad_insumo) omitidos.push(`${ing.nombre} (la receta usa ${ing.unidad} y la lista ${ing.unidad_insumo})`);
+    else movimientos.push({ insumo_id: ing.insumo_id, cantidad: -ing.cantidad * factor });
+  }
+  return { movimientos, omitidos };
+}
+
+const textoDescontados = (n) => `Se descontaron ${n} ingrediente${n === 1 ? "" : "s"} del stock.`;
+
 async function produccion(env, datos) {
   const receta = await env.DB.prepare("SELECT id, nombre, molde_cm FROM recetas WHERE nombre = ?1")
     .bind(String(datos.receta || "").trim()).first();
@@ -208,22 +240,7 @@ async function produccion(env, datos) {
   const unidades = numero(datos.unidades) > 0 ? numero(datos.unidades) : 1;
   const factor = Math.pow(destino / receta.molde_cm, 2) * unidades;
 
-  // El ingrediente se enlaza por insumo_id o, si se agregó a la lista después, por nombre
-  const { results } = await env.DB.prepare(`
-    SELECT ri.nombre, ri.cantidad, ri.unidad, i.id AS insumo_id, i.unidad AS unidad_insumo
-    FROM receta_ingredientes ri
-    LEFT JOIN insumos i ON i.id = coalesce(ri.insumo_id, (SELECT id FROM insumos WHERE nombre = ri.nombre))
-    WHERE ri.receta_id = ?1
-    ORDER BY ri.orden`).bind(receta.id).all();
-
-  const movimientos = [];
-  const omitidos = [];
-  for (const ing of results) {
-    if (!ing.insumo_id) omitidos.push(`${ing.nombre} (no está en la lista de insumos)`);
-    else if (!(ing.cantidad > 0)) omitidos.push(`${ing.nombre} (sin cantidad)`);
-    else if (ing.unidad !== ing.unidad_insumo) omitidos.push(`${ing.nombre} (la receta usa ${ing.unidad} y la lista ${ing.unidad_insumo})`);
-    else movimientos.push({ insumo_id: ing.insumo_id, cantidad: -ing.cantidad * factor });
-  }
+  const { movimientos, omitidos } = descuentos(await ingredientesReceta(env, receta.id), factor);
   if (!movimientos.length) {
     return Response.json({ error: "Ningún ingrediente de la receta se pudo descontar", omitidos }, { status: 400 });
   }
@@ -231,10 +248,7 @@ async function produccion(env, datos) {
   await env.DB.batch(operacion(env, "produccion",
     `${receta.nombre} ×${formato.format(unidades)} en molde de ${formato.format(destino)} cm`,
     receta.id, movimientos));
-  return Response.json({
-    mensaje: `Se descontaron ${movimientos.length} ingrediente${movimientos.length === 1 ? "" : "s"} de ${receta.nombre}.`,
-    omitidos,
-  });
+  return Response.json({ mensaje: textoDescontados(movimientos.length), omitidos });
 }
 
 async function apiStock(request, env, ruta) {
@@ -263,32 +277,17 @@ async function apiStock(request, env, ruta) {
 
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 
-// Costo de una unidad del producto con la receta del mismo nombre, igual que el calculador:
-// ingredientes escalados por molde + gas/luz/otros % + caja. null si no hay receta.
-async function costoReceta(env, producto, medida) {
-  const receta = await env.DB.prepare(
-    "SELECT id, molde_cm, destino_cm, caja, otros_pct FROM recetas WHERE nombre = ?1"
-  ).bind(producto).first();
-  if (!receta) return { recetaId: null, costo: null };
-
-  const molde = medida > 0 ? medida : receta.destino_cm;
-  const factor = Math.pow(molde / receta.molde_cm, 2);
-  const { results } = await env.DB.prepare(`
-    SELECT ri.cantidad, ri.unidad, ri.paquete, ri.precio,
-           i.unidad AS unidad_insumo, i.cantidad_paquete AS paquete_insumo, i.precio_paquete AS precio_insumo
-    FROM receta_ingredientes ri
-    LEFT JOIN insumos i ON i.id = coalesce(ri.insumo_id, (SELECT id FROM insumos WHERE nombre = ri.nombre))
-    WHERE ri.receta_id = ?1`).bind(receta.id).all();
-
-  let ingredientes = 0;
-  for (const ing of results) {
+// Costo de una unidad con la receta, igual que el calculador:
+// ingredientes escalados por molde + gas/luz/otros % + caja
+function costoUnidad(receta, ingredientes, factor) {
+  let total = 0;
+  for (const ing of ingredientes) {
     const usa = (ing.cantidad || 0) * factor;
     // Precio vigente de la lista si coincide la unidad; si no, lo cargado en la receta
-    if (ing.unidad_insumo && ing.unidad_insumo === ing.unidad) ingredientes += (usa / ing.paquete_insumo) * ing.precio_insumo;
-    else if (ing.paquete > 0) ingredientes += (usa / ing.paquete) * (ing.precio || 0);
+    if (ing.unidad_insumo && ing.unidad_insumo === ing.unidad) total += (usa / ing.paquete_insumo) * ing.precio_insumo;
+    else if (ing.paquete > 0) total += (usa / ing.paquete) * (ing.precio || 0);
   }
-  const costo = ingredientes * (1 + receta.otros_pct / 100) + receta.caja;
-  return { recetaId: receta.id, costo: Math.round(costo * 100) / 100 };
+  return Math.round((total * (1 + receta.otros_pct / 100) + receta.caja) * 100) / 100;
 }
 
 async function verVentas(env, url) {
@@ -318,17 +317,42 @@ async function registrarVenta(env, datos) {
   if (!producto) return error(400, "Indicá el producto");
   if (precio == null || precio < 0) return error(400, "Indicá el precio");
 
-  const { recetaId, costo } = await costoReceta(env, producto, medida);
-  await env.DB.prepare(`
+  const nota = String(datos.nota || "").trim().slice(0, 200) || null;
+
+  const consultas = [];
+  const venta = (costo, recetaId) => env.DB.prepare(`
     INSERT INTO ventas (fecha, producto, medida_cm, cantidad, precio_unitario, costo_unitario, receta_id, nota)
     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)`
-  ).bind(fecha, producto, medida > 0 ? medida : null, cantidadVendida, precio, costo, recetaId,
-    String(datos.nota || "").trim().slice(0, 200) || null).run();
+  ).bind(fecha, producto, medida > 0 ? medida : null, cantidadVendida, precio, costo, recetaId, nota);
 
-  return Response.json({
-    mensaje: `Venta registrada: ${formato.format(cantidadVendida)} × ${producto}.` +
-      (costo == null ? " Sin receta guardada con ese nombre, no se calcula la ganancia." : ""),
-  });
+  // Con receta del mismo nombre: costo estimado y descuento de ingredientes del stock
+  const receta = await env.DB.prepare(
+    "SELECT id, nombre, molde_cm, destino_cm, caja, otros_pct FROM recetas WHERE nombre = ?1"
+  ).bind(producto).first();
+  let mensaje = `Venta registrada: ${formato.format(cantidadVendida)} × ${producto}.`;
+  let omitidos = [];
+  if (!receta) {
+    consultas.push(venta(null, null));
+    mensaje += " Sin receta guardada con ese nombre: no se calcula la ganancia ni se descuenta stock.";
+  } else {
+    const molde = medida > 0 ? medida : receta.destino_cm;
+    const factor = Math.pow(molde / receta.molde_cm, 2);
+    const ingredientes = await ingredientesReceta(env, receta.id);
+    const d = descuentos(ingredientes, factor * cantidadVendida);
+    omitidos = d.omitidos;
+    consultas.push(venta(costoUnidad(receta, ingredientes, factor), receta.id));
+    if (d.movimientos.length) {
+      consultas.push(...operacion(env, "produccion",
+        `Venta: ${receta.nombre} ×${formato.format(cantidadVendida)} en molde de ${formato.format(molde)} cm`,
+        receta.id, d.movimientos, true));
+      mensaje += " " + textoDescontados(d.movimientos.length);
+    } else {
+      mensaje += " Ningún ingrediente de la receta se pudo descontar del stock.";
+    }
+  }
+
+  await env.DB.batch(consultas);
+  return Response.json({ mensaje, omitidos });
 }
 
 async function apiVentas(request, env, ruta, url) {
@@ -343,7 +367,11 @@ async function apiVentas(request, env, ruta, url) {
     return registrarVenta(env, datos || {});
   }
   if (/^\d+$/.test(ruta || "") && request.method === "DELETE") {
-    await env.DB.prepare("DELETE FROM ventas WHERE id = ?1").bind(Number(ruta)).run();
+    // Se borra también el descuento de stock de esa venta (devuelve los ingredientes)
+    await env.DB.batch([
+      env.DB.prepare("DELETE FROM operaciones_stock WHERE venta_id = ?1").bind(Number(ruta)),
+      env.DB.prepare("DELETE FROM ventas WHERE id = ?1").bind(Number(ruta)),
+    ]);
     return new Response(null, { status: 204 });
   }
   return error(404, "No existe");
