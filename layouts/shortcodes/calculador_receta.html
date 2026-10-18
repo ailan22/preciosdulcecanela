@@ -1,4 +1,11 @@
+{{- $insumos := site.Data.insumos -}}
 <div class="dc-card" id="dc-receta">
+  <script type="application/json" class="dc-insumos">{{ $insumos | jsonify | safeJS }}</script>
+  <datalist id="dc-lista-insumos">
+    {{- range $insumos }}
+    <option value="{{ .nombre }}">{{ .categoria }} · ${{ .precio }} por {{ .paquete }} {{ .unidad }}</option>
+    {{- end }}
+  </datalist>
   <div class="dc-guardadas">
     <label>Receta guardada
       <select data-campo="guardadas"><option value="">— Nueva receta —</option></select>

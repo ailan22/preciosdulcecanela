@@ -101,16 +101,30 @@ function crearReceta(raiz, precios) {
   const guardadas = campo("guardadas");
   const comparar = campo("comparar");
 
+  // Insumos de la base (db/), exportados a data/insumos.json
+  const datosInsumos = raiz.querySelector(".dc-insumos");
+  const insumos = new Map(
+    (datosInsumos ? JSON.parse(datosInsumos.textContent) || [] : []).map((i) => [i.nombre.toLowerCase(), i])
+  );
+  const buscarInsumo = (nombre) => insumos.get(String(nombre || "").trim().toLowerCase());
+
   if (precios) {
     precios.productos.forEach((p, i) => comparar.add(new Option(p.nombre, i)));
   } else {
     comparar.closest("label").hidden = true;
   }
 
+  // Completa unidad, paquete y precio con los datos actuales del insumo
+  function aplicarInsumo(fila, insumo) {
+    fila.querySelector('[data-ing="unidad"]').value = insumo.unidad;
+    fila.querySelector('[data-ing="paquete"]').value = insumo.paquete;
+    fila.querySelector('[data-ing="precio"]').value = insumo.precio;
+  }
+
   function filaIngrediente(ing = {}) {
     const fila = cuerpo.insertRow();
     fila.innerHTML = `
-      <td class="dc-celda-nombre" data-label="Ingrediente"><input type="text" data-ing="nombre" aria-label="Ingrediente" placeholder="Harina"></td>
+      <td class="dc-celda-nombre" data-label="Ingrediente"><input type="text" data-ing="nombre" aria-label="Ingrediente" placeholder="Harina" list="dc-lista-insumos" autocomplete="off"></td>
       <td class="dc-num" data-label="Cantidad"><input type="number" min="0" step="any" data-ing="cantidad" aria-label="Cantidad en la receta"></td>
       <td data-label="Unidad"><select data-ing="unidad" aria-label="Unidad">${UNIDADES.map((u) => `<option>${u}</option>`).join("")}</select></td>
       <td class="dc-num" data-label="Paquete trae"><input type="number" min="0" step="any" data-ing="paquete" aria-label="Cantidad que trae el paquete" placeholder="1000"></td>
@@ -121,6 +135,9 @@ function crearReceta(raiz, precios) {
     for (const k of ["nombre", "cantidad", "unidad", "paquete", "precio"]) {
       if (ing[k] != null) fila.querySelector(`[data-ing="${k}"]`).value = ing[k];
     }
+    // Las recetas guardadas toman el precio vigente de la base
+    const insumo = buscarInsumo(ing.nombre);
+    if (insumo) aplicarInsumo(fila, insumo);
   }
 
   function estado() {
@@ -206,7 +223,13 @@ function crearReceta(raiz, precios) {
     guardadas.value = seleccion;
   }
 
-  raiz.addEventListener("input", calcular);
+  raiz.addEventListener("input", (ev) => {
+    if (ev.target.dataset.ing === "nombre") {
+      const insumo = buscarInsumo(ev.target.value);
+      if (insumo) aplicarInsumo(ev.target.closest("tr"), insumo);
+    }
+    calcular();
+  });
   raiz.addEventListener("change", (ev) => {
     if (ev.target === guardadas) {
       const recetas = leer(CLAVE_RECETAS, {});
