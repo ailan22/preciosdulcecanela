@@ -32,6 +32,33 @@ function escribir(clave, valor) {
   }
 }
 
+// ---------- API (base D1, ver worker/index.js) ----------
+
+// Llama a /api/<ruta> con la clave guardada. Si falla lanza un Error con .status
+// (undefined si no hubo respuesta, por ejemplo con hugo server)
+async function api(ruta, metodo = "GET", datos) {
+  const r = await fetch("/api/" + ruta, {
+    method: metodo,
+    headers: { "X-Clave": leer(CLAVE_ACCESO, ""), ...(datos ? { "Content-Type": "application/json" } : {}) },
+    body: datos ? JSON.stringify(datos) : undefined,
+  });
+  const cuerpo = r.status === 204 ? null : await r.json().catch(() => null);
+  if (!r.ok) throw Object.assign(new Error((cuerpo && cuerpo.error) || `error ${r.status}`), { status: r.status, datos: cuerpo });
+  return cuerpo;
+}
+
+// La clave sirve para recetas y stock: al ingresarla en una sección se avisa a las demás
+function formularioClave(form, alConectar) {
+  form.addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    const input = form.querySelector('[data-campo="clave"]');
+    escribir(CLAVE_ACCESO, input.value);
+    input.value = "";
+    document.dispatchEvent(new CustomEvent("dc-clave", { detail: form }));
+  });
+  document.addEventListener("dc-clave", (ev) => alConectar(ev.detail === form));
+}
+
 // ---------- Precios ----------
 
 function crearPrecios(raiz) {
@@ -237,28 +264,24 @@ function crearReceta(raiz, precios) {
     estadoRecetas.classList.toggle("dc-alerta", alerta);
   }
 
-  async function api(metodo, nombre = "", datos) {
-    const r = await fetch("/api/recetas" + (nombre ? "/" + encodeURIComponent(nombre) : ""), {
-      method: metodo,
-      headers: { "X-Clave": leer(CLAVE_ACCESO, ""), ...(datos ? { "Content-Type": "application/json" } : {}) },
-      body: datos ? JSON.stringify(datos) : undefined,
-    });
-    if (!r.ok) throw r.status;
-    return r.status === 204 ? null : r.json();
-  }
+  const apiRecetas = (metodo, nombre = "", datos) =>
+    api("recetas" + (nombre ? "/" + encodeURIComponent(nombre) : ""), metodo, datos);
+
+  // Avisa a la sección de stock que cambió la lista de recetas
+  const recetasCambiaron = () => document.dispatchEvent(new Event("dc-recetas"));
 
   async function traerDeBase() {
-    const lista = await api("GET");
+    const lista = await apiRecetas("GET");
     recetas = Object.fromEntries(lista.map((r) => [r.nombre, r]));
   }
 
   async function conectar(claveNueva = false) {
     try {
       await traerDeBase();
-    } catch (status) {
+    } catch (e) {
       enBase = false;
-      formClave.hidden = status !== 401;
-      if (status === 401) {
+      formClave.hidden = e.status !== 401;
+      if (e.status === 401) {
         avisar(claveNueva
           ? "Clave incorrecta."
           : "Las recetas se guardan solo en este navegador. Ingresá la clave para guardarlas en la base.", claveNueva);
@@ -272,13 +295,16 @@ function crearReceta(raiz, precios) {
     // Sube las recetas que estaban guardadas solo en este navegador
     const locales = Object.entries(leer(CLAVE_RECETAS, {})).filter(([n]) => !recetas[n]);
     try {
-      for (const [n, r] of locales) await api("PUT", n, r);
-      if (locales.length) await traerDeBase();
+      for (const [n, r] of locales) await apiRecetas("PUT", n, r);
+      if (locales.length) {
+        await traerDeBase();
+        recetasCambiaron();
+      }
       escribir(CLAVE_RECETAS, {});
       avisar(locales.length
         ? `Las recetas se guardan en la base de datos (${locales.length === 1 ? "se subió 1 receta" : `se subieron ${locales.length} recetas`} de este navegador).`
         : "Las recetas se guardan en la base de datos.");
-    } catch (status) {
+    } catch (e) {
       avisar("No se pudieron subir las recetas de este navegador; siguen guardadas acá.", true);
     }
     listarGuardadas(guardadas.value);
@@ -305,12 +331,7 @@ function crearReceta(raiz, precios) {
     }
   });
 
-  formClave.addEventListener("submit", (ev) => {
-    ev.preventDefault();
-    escribir(CLAVE_ACCESO, campo("clave").value);
-    campo("clave").value = "";
-    conectar(true);
-  });
+  formularioClave(formClave, conectar);
 
   raiz.addEventListener("click", async (ev) => {
     const boton = ev.target.closest("[data-accion]");
@@ -332,12 +353,13 @@ function crearReceta(raiz, precios) {
       }
       if (enBase) {
         try {
-          await api("PUT", e.nombre, e);
+          await apiRecetas("PUT", e.nombre, e);
           await traerDeBase();
-        } catch (status) {
-          avisar(`No se pudo guardar "${e.nombre}" en la base (error ${status}). Probá de nuevo.`, true);
+        } catch (err) {
+          avisar(`No se pudo guardar "${e.nombre}" en la base (${err.message}). Probá de nuevo.`, true);
           return;
         }
+        recetasCambiaron();
         avisar(`"${e.nombre}" guardada en la base de datos.`);
       } else {
         recetas[e.nombre] = e;
@@ -351,12 +373,13 @@ function crearReceta(raiz, precios) {
       if (!nombre) return;
       if (enBase) {
         try {
-          await api("DELETE", nombre);
+          await apiRecetas("DELETE", nombre);
           await traerDeBase();
-        } catch (status) {
-          avisar(`No se pudo borrar "${nombre}" de la base (error ${status}).`, true);
+        } catch (err) {
+          avisar(`No se pudo borrar "${nombre}" de la base (${err.message}).`, true);
           return;
         }
+        recetasCambiaron();
         avisar(`"${nombre}" borrada de la base de datos.`);
       } else {
         delete recetas[nombre];
@@ -389,7 +412,234 @@ function crearReceta(raiz, precios) {
     .catch(() => {});
 }
 
+// ---------- Stock ----------
+
+const TIPOS_OPERACION = { compra: "Compra", produccion: "Receta", ajuste: "Conteo" };
+const fechaCorta = new Intl.DateTimeFormat("es-UY", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+
+function crearStock(raiz) {
+  const campo = (n) => raiz.querySelector(`[data-campo="${n}"]`);
+  const formOp = (op) => raiz.querySelector(`.dc-operacion[data-op="${op}"]`);
+  const estado = raiz.querySelector(".dc-estado-recetas");
+  const formClave = raiz.querySelector(".dc-clave");
+  const contenido = raiz.querySelector(".dc-stock-contenido");
+  const resultado = raiz.querySelector(".dc-resultado");
+  let insumos = [];
+  let recetas = [];
+
+  const conUnidad = (n, unidad) => `${cantidad.format(n)} ${unidad}`;
+  const buscarInsumo = (nombre) => {
+    const n = String(nombre || "").trim().toLowerCase();
+    return insumos.find((i) => i.nombre.toLowerCase() === n);
+  };
+
+  function avisar(texto, alerta = false) {
+    estado.textContent = texto;
+    estado.classList.toggle("dc-alerta", alerta);
+  }
+
+  function mostrarResultado(texto, omitidos = [], alerta = false) {
+    const lineas = [texto, omitidos.length ? `No se descontaron: ${omitidos.join(", ")}.` : ""].filter(Boolean);
+    resultado.replaceChildren(...lineas.map((l) => Object.assign(document.createElement("p"), { textContent: l })));
+    resultado.classList.toggle("dc-alerta", alerta);
+  }
+
+  function celda(fila, texto, etiqueta, clase = "") {
+    const td = fila.insertCell();
+    td.textContent = texto;
+    td.dataset.label = etiqueta;
+    if (clase) td.className = clase;
+    return td;
+  }
+
+  function dibujarStock() {
+    const filtro = campo("buscar").value.trim().toLowerCase();
+    const soloConStock = campo("con-stock").checked;
+    const cuerpo = raiz.querySelector(".dc-tabla-stock tbody");
+    cuerpo.replaceChildren();
+    for (const i of insumos) {
+      if (soloConStock && Math.abs(i.stock) < 1e-9) continue;
+      if (filtro && !`${i.nombre} ${i.categoria}`.toLowerCase().includes(filtro)) continue;
+      const fila = cuerpo.insertRow();
+      const th = document.createElement("th");
+      th.scope = "row";
+      th.textContent = i.nombre;
+      fila.appendChild(th);
+      celda(fila, i.categoria, "Categoría", "dc-categoria");
+      const stock = celda(fila, conUnidad(i.stock, i.unidad), "Stock", "dc-num");
+      if (i.stock < 0) stock.classList.add("dc-negativo");
+      celda(fila, i.valor > 0 ? pesos(i.valor) : "—", "Valor", "dc-num");
+    }
+    const total = insumos.reduce((t, i) => t + Math.max(i.valor, 0), 0);
+    raiz.querySelector("[data-total]").textContent =
+      `Valor del stock a precio de lista: ${pesos(total)}.` +
+      (insumos.some((i) => i.stock < 0) ? " En rojo, insumos que quedaron en negativo: conviene contarlos." : "");
+  }
+
+  function dibujarMovimientos(operaciones) {
+    const cuerpo = raiz.querySelector(".dc-tabla-movimientos tbody");
+    cuerpo.replaceChildren();
+    if (!operaciones.length) {
+      const td = cuerpo.insertRow().insertCell();
+      td.colSpan = 4;
+      td.textContent = "Todavía no hay movimientos.";
+      return;
+    }
+    for (const op of operaciones) {
+      const fila = cuerpo.insertRow();
+      // La base guarda la fecha en UTC
+      celda(fila, fechaCorta.format(new Date(op.fecha.replace(" ", "T") + "Z")), "Fecha");
+      celda(fila, TIPOS_OPERACION[op.tipo] || op.tipo, "Qué");
+      const detalle = celda(fila, op.detalle, "Detalle", "dc-detalle");
+      if (op.tipo === "produccion" && op.movimientos.length) {
+        const lista = document.createElement("small");
+        lista.textContent = op.movimientos
+          .map((m) => `${m.nombre} ${m.cantidad < 0 ? "−" : "+"}${conUnidad(Math.abs(m.cantidad), m.unidad)}`)
+          .join(" · ");
+        detalle.append(document.createElement("br"), lista);
+      }
+      const td = fila.insertCell();
+      td.className = "dc-celda-quitar";
+      const boton = document.createElement("button");
+      boton.type = "button";
+      boton.className = "dc-sec dc-deshacer";
+      boton.dataset.deshacer = op.id;
+      boton.textContent = "Deshacer";
+      td.appendChild(boton);
+    }
+  }
+
+  function llenarListas() {
+    const select = formOp("produccion").elements.receta;
+    const elegida = select.value;
+    select.length = 1;
+    recetas.forEach((r) => select.add(new Option(r.nombre, r.nombre)));
+    select.value = recetas.some((r) => r.nombre === elegida) ? elegida : "";
+
+    raiz.querySelector("#dc-lista-stock").replaceChildren(
+      ...insumos.map((i) => new Option(`Tenés ${conUnidad(i.stock, i.unidad)}`, i.nombre)));
+  }
+
+  // Ayuda bajo los formularios de compra y conteo según el insumo elegido
+  function ayudar(form) {
+    const insumo = buscarInsumo(form.elements.insumo.value);
+    const ayuda = form.querySelector("[data-ayuda]");
+    if (!insumo) {
+      ayuda.textContent = form.elements.insumo.value.trim() ? "Ese insumo no está en la lista." : "";
+      if (form.dataset.op === "compra") form.elements.precio.placeholder = "igual";
+      return;
+    }
+    if (form.dataset.op === "compra") {
+      const paquetes = num(form.elements.paquetes);
+      form.elements.precio.placeholder = cantidad.format(insumo.precio);
+      ayuda.textContent = `Paquete de ${conUnidad(insumo.paquete, insumo.unidad)} a ${pesos(insumo.precio)}. ` +
+        `Sumás ${conUnidad(paquetes * insumo.paquete, insumo.unidad)}; ahora tenés ${conUnidad(insumo.stock, insumo.unidad)}.`;
+    } else {
+      form.querySelector("[data-unidad]").textContent = insumo.unidad;
+      ayuda.textContent = `Ahora figura ${conUnidad(insumo.stock, insumo.unidad)}.`;
+    }
+  }
+
+  async function cargar(claveNueva = false) {
+    let stock;
+    try {
+      [stock, recetas] = await Promise.all([api("stock"), api("recetas")]);
+    } catch (e) {
+      contenido.hidden = true;
+      formClave.hidden = e.status !== 401;
+      if (e.status === 401) {
+        avisar(claveNueva ? "Clave incorrecta." : "Ingresá la clave para ver y cargar el stock.", claveNueva);
+      } else {
+        avisar(e.status ? `No se pudo leer el stock (${e.message}).` : "El stock necesita la base de datos, que no está disponible acá.", true);
+      }
+      return;
+    }
+    insumos = stock.insumos;
+    formClave.hidden = true;
+    contenido.hidden = false;
+    avisar("");
+    llenarListas();
+    dibujarStock();
+    dibujarMovimientos(stock.operaciones);
+    for (const op of ["compra", "ajuste"]) ayudar(formOp(op));
+  }
+
+  raiz.addEventListener("click", async (ev) => {
+    const pestana = ev.target.closest("[data-pestana]");
+    if (pestana) {
+      raiz.querySelectorAll("[data-pestana]").forEach((b) => b.setAttribute("aria-pressed", b === pestana));
+      raiz.querySelectorAll(".dc-operacion").forEach((f) => (f.hidden = f.dataset.op !== pestana.dataset.pestana));
+      resultado.replaceChildren();
+      return;
+    }
+
+    // Deshacer pide un segundo clic para confirmar
+    const boton = ev.target.closest("[data-deshacer]");
+    if (!boton) return;
+    if (!boton.classList.contains("dc-confirmar")) {
+      raiz.querySelectorAll(".dc-confirmar").forEach((b) => {
+        b.classList.remove("dc-confirmar");
+        b.textContent = "Deshacer";
+      });
+      boton.classList.add("dc-confirmar");
+      boton.textContent = "¿Seguro?";
+      return;
+    }
+    boton.disabled = true;
+    try {
+      await api(`stock/operaciones/${boton.dataset.deshacer}`, "DELETE");
+      mostrarResultado("Movimiento deshecho.");
+    } catch (e) {
+      mostrarResultado(`No se pudo deshacer (${e.message}).`, [], true);
+    }
+    await cargar();
+  });
+
+  raiz.addEventListener("input", (ev) => {
+    const form = ev.target.closest(".dc-operacion");
+    if (form && form.dataset.op !== "produccion") ayudar(form);
+    if (ev.target.closest(".dc-filtros")) dibujarStock();
+  });
+
+  formOp("produccion").elements.receta.addEventListener("change", (ev) => {
+    const receta = recetas.find((r) => r.nombre === ev.target.value);
+    if (receta) formOp("produccion").elements.destino.value = receta.destino || receta.molde;
+  });
+
+  raiz.querySelectorAll(".dc-operacion").forEach((form) => form.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const op = form.dataset.op;
+    if (op !== "produccion" && !buscarInsumo(form.elements.insumo.value)) {
+      mostrarResultado("Elegí un insumo de la lista.", [], true);
+      form.elements.insumo.focus();
+      return;
+    }
+    const enviar = form.querySelector('[type="submit"]');
+    enviar.disabled = true;
+    try {
+      const r = await api(`stock/${op}`, "POST", Object.fromEntries(new FormData(form)));
+      mostrarResultado(r.mensaje, r.omitidos || []);
+      if (op !== "produccion") {
+        form.elements.insumo.value = "";
+        if (op === "compra") form.elements.precio.value = "";
+        else form.elements.cantidad.value = "";
+      }
+      await cargar();
+    } catch (e) {
+      mostrarResultado(e.message, (e.datos && e.datos.omitidos) || [], true);
+    } finally {
+      enviar.disabled = false;
+    }
+  }));
+
+  formularioClave(formClave, cargar);
+  document.addEventListener("dc-recetas", () => cargar());
+  cargar();
+}
+
 document.addEventListener("DOMContentLoaded", () => {
+  const stock = document.getElementById("dc-stock");
+  if (stock) crearStock(stock);
   const tabla = document.getElementById("dc-precios");
   const precios = tabla ? crearPrecios(tabla) : null;
   const receta = document.getElementById("dc-receta");

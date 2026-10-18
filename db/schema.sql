@@ -3,6 +3,9 @@
 
 PRAGMA foreign_keys = ON;
 
+DROP VIEW IF EXISTS v_stock;
+DROP TABLE IF EXISTS movimientos_stock;
+DROP TABLE IF EXISTS operaciones_stock;
 DROP TABLE IF EXISTS receta_ingredientes;
 DROP TABLE IF EXISTS recetas;
 DROP VIEW IF EXISTS v_insumos;
@@ -95,3 +98,40 @@ CREATE TABLE receta_ingredientes (
 );
 
 CREATE INDEX receta_ingredientes_receta ON receta_ingredientes(receta_id, orden);
+
+-- Stock: cada compra, receta hecha o conteo es una operación con sus movimientos.
+-- El stock de un insumo es la suma de sus movimientos; borrar la operación la deshace.
+CREATE TABLE operaciones_stock (
+  id        INTEGER PRIMARY KEY,
+  tipo      TEXT    NOT NULL CHECK (tipo IN ('compra', 'produccion', 'ajuste')),
+  fecha     TEXT    NOT NULL DEFAULT (datetime('now')),
+  detalle   TEXT    NOT NULL,
+  receta_id INTEGER REFERENCES recetas(id) ON DELETE SET NULL
+);
+
+-- cantidad en la unidad del insumo: positiva entra, negativa sale.
+CREATE TABLE movimientos_stock (
+  id           INTEGER PRIMARY KEY,
+  operacion_id INTEGER NOT NULL REFERENCES operaciones_stock(id) ON DELETE CASCADE,
+  insumo_id    INTEGER NOT NULL REFERENCES insumos(id) ON DELETE CASCADE,
+  cantidad     REAL    NOT NULL
+);
+
+CREATE INDEX movimientos_stock_insumo ON movimientos_stock(insumo_id);
+CREATE INDEX movimientos_stock_operacion ON movimientos_stock(operacion_id);
+
+-- Stock actual y cuánto vale a precio de lista.
+CREATE VIEW v_stock AS
+SELECT
+  i.id,
+  i.nombre,
+  c.nombre AS categoria,
+  i.unidad,
+  i.cantidad_paquete AS paquete,
+  i.precio_paquete AS precio,
+  coalesce(sum(m.cantidad), 0) AS stock,
+  round(coalesce(sum(m.cantidad), 0) * i.precio_paquete / i.cantidad_paquete, 2) AS valor
+FROM insumos i
+JOIN categorias c ON c.id = i.categoria_id
+LEFT JOIN movimientos_stock m ON m.insumo_id = i.id
+GROUP BY i.id;

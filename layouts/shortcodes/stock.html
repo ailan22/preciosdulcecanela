@@ -1,0 +1,88 @@
+<div class="dc-card" id="dc-stock">
+  <p class="dc-estado-recetas" aria-live="polite">Cargando stock…</p>
+  <form class="dc-clave" hidden>
+    <label>Clave de recetas
+      <input type="password" data-campo="clave" autocomplete="current-password">
+    </label>
+    <button type="submit">Entrar</button>
+  </form>
+
+  <div class="dc-stock-contenido" hidden>
+    <datalist id="dc-lista-stock"></datalist>
+
+    <div class="dc-pestanas" role="group" aria-label="Qué querés registrar">
+      <button type="button" class="dc-sec" data-pestana="produccion" aria-pressed="true">Hice una receta</button>
+      <button type="button" class="dc-sec" data-pestana="compra" aria-pressed="false">Compré</button>
+      <button type="button" class="dc-sec" data-pestana="ajuste" aria-pressed="false">Conté lo que tengo</button>
+    </div>
+
+    <form class="dc-operacion dc-controles" data-op="produccion">
+      <label class="dc-ancho">Receta
+        <select name="receta" required><option value="">— Elegí una receta guardada —</option></select>
+      </label>
+      <label>Molde
+        <span class="dc-input-sufijo"><input type="number" name="destino" min="1" step="1" value="18" required><span>cm</span></span>
+      </label>
+      <label>Cantidad
+        <span class="dc-input-sufijo"><input type="number" name="unidades" min="0.1" step="any" value="1" required><span>tortas</span></span>
+      </label>
+      <div class="dc-ancho"><button type="submit">Descontar del stock</button></div>
+    </form>
+
+    <form class="dc-operacion dc-controles" data-op="compra" hidden>
+      <label class="dc-ancho">Insumo
+        <input type="text" name="insumo" list="dc-lista-stock" autocomplete="off" placeholder="Harina" required>
+      </label>
+      <label>Paquetes
+        <input type="number" name="paquetes" min="0.01" step="any" value="1" required>
+      </label>
+      <label>Precio por paquete
+        <span class="dc-input-prefijo"><span>$</span><input type="number" name="precio" min="0" step="any" placeholder="igual"></span>
+      </label>
+      <p class="dc-ancho dc-ayuda" data-ayuda></p>
+      <div class="dc-ancho"><button type="submit">Sumar al stock</button></div>
+    </form>
+
+    <form class="dc-operacion dc-controles" data-op="ajuste" hidden>
+      <label class="dc-ancho">Insumo
+        <input type="text" name="insumo" list="dc-lista-stock" autocomplete="off" placeholder="Harina" required>
+      </label>
+      <label>Tengo
+        <span class="dc-input-sufijo"><input type="number" name="cantidad" min="0" step="any" required><span data-unidad>g</span></span>
+      </label>
+      <p class="dc-ancho dc-ayuda" data-ayuda></p>
+      <div class="dc-ancho"><button type="submit">Guardar conteo</button></div>
+    </form>
+
+    <div class="dc-resultado" aria-live="polite"></div>
+
+    <h3 class="dc-subtitulo">Lo que tengo</h3>
+    <div class="dc-controles dc-filtros">
+      <label>Buscar
+        <input type="search" data-campo="buscar" placeholder="Insumo o categoría">
+      </label>
+      <label class="dc-check">
+        <span><input type="checkbox" data-campo="con-stock"> Solo lo que tengo</span>
+      </label>
+    </div>
+    <div class="dc-tabla-scroll">
+      <table class="dc-tabla dc-tabla-stock">
+        <thead>
+          <tr><th>Insumo</th><th>Categoría</th><th class="dc-num">Stock</th><th class="dc-num">Valor</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <p class="dc-leyenda" data-total></p>
+
+    <h3 class="dc-subtitulo">Últimos movimientos</h3>
+    <div class="dc-tabla-scroll">
+      <table class="dc-tabla dc-tabla-movimientos">
+        <thead>
+          <tr><th>Fecha</th><th>Qué</th><th>Detalle</th><th><span class="dc-oculto">Deshacer</span></th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>

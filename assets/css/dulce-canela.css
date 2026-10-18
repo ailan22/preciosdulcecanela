@@ -252,6 +252,89 @@
   display: none;
 }
 
+/* ---------- Stock ---------- */
+.dc-pestanas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5em;
+  margin-bottom: 1em;
+}
+
+.dc-card .dc-pestanas button[aria-pressed="true"] {
+  background: var(--dc-canela);
+  color: #fff;
+}
+
+.dc-operacion[hidden] {
+  display: none;
+}
+
+.dc-ayuda {
+  margin: 0;
+  font-size: 0.85em;
+  color: #7a5a44;
+}
+
+.dc-ayuda:empty {
+  display: none;
+}
+
+.dc-resultado p {
+  margin: 0 0 0.4em;
+  font-weight: 600;
+  color: var(--dc-canela-oscuro);
+}
+
+.dc-resultado.dc-alerta p {
+  color: var(--dc-alerta);
+}
+
+.dc-card .dc-subtitulo {
+  margin: 1.6em 0 0.6em;
+  font-size: 1.1em;
+  color: var(--dc-canela-oscuro);
+}
+
+.dc-card label.dc-check {
+  justify-content: flex-end;
+}
+
+.dc-card label.dc-check span {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0.45em 0;
+}
+
+.dc-card label.dc-check input {
+  width: auto;
+}
+
+.dc-card td.dc-negativo {
+  color: var(--dc-alerta);
+  font-weight: 700;
+}
+
+.dc-card table.dc-tabla td.dc-detalle {
+  white-space: normal;
+  min-width: 14em;
+}
+
+.dc-detalle small {
+  color: #7a5a44;
+}
+
+.dc-card button.dc-deshacer {
+  padding: 0.25em 0.8em;
+  font-size: 0.9em;
+}
+
+.dc-card button.dc-deshacer.dc-confirmar {
+  color: #fff;
+  background: var(--dc-alerta);
+  border-color: var(--dc-alerta);
+}
+
 .dc-ingredientes input,
 .dc-ingredientes select {
   padding: 0.35em 0.45em;
@@ -482,6 +565,44 @@
 
   .dc-guardadas label {
     flex-basis: 100%;
+  }
+
+  /* Stock: nombre arriba, stock y valor en fila */
+  .dc-card table.dc-tabla-stock tbody > tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    padding: 0.5em 0.4em;
+  }
+
+  .dc-tabla-stock tbody th {
+    grid-column: 1 / -1;
+  }
+
+  .dc-card .dc-tabla-stock td.dc-categoria {
+    display: none;
+  }
+
+  .dc-card .dc-tabla-stock td {
+    text-align: left;
+    padding: 0.2em 0.6em;
+  }
+
+  /* Movimientos: fecha y tipo arriba, detalle y botón abajo */
+  .dc-card table.dc-tabla-movimientos tbody > tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    padding: 0.5em 0.4em;
+  }
+
+  .dc-card .dc-tabla-movimientos td {
+    padding: 0.2em 0.6em;
+  }
+
+  .dc-card table.dc-tabla td.dc-detalle,
+  .dc-card .dc-tabla-movimientos td.dc-celda-quitar,
+  .dc-card .dc-tabla-movimientos td[colspan] {
+    grid-column: 1 / -1;
+    min-width: 0;
   }
 
   .dc-resumen {
