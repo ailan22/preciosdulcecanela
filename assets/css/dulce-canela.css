@@ -192,12 +192,6 @@
   box-shadow: inset 3px 0 0 var(--dc-canela);
 }
 
-.dc-marca-fijo {
-  color: var(--dc-canela);
-  font-weight: 700;
-  margin-left: 0.15em;
-}
-
 .dc-leyenda,
 .dc-factor {
   font-size: 0.85em;
@@ -585,6 +579,28 @@
   .dc-card .dc-tabla-stock td {
     text-align: left;
     padding: 0.2em 0.6em;
+  }
+
+  /* Ventas: una tarjeta por día o por venta */
+  .dc-card table.dc-tabla-dias tbody > tr,
+  .dc-card table.dc-tabla-ventas tbody > tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    padding: 0.5em 0.4em;
+  }
+
+  .dc-card .dc-tabla-dias th,
+  .dc-card .dc-tabla-dias td,
+  .dc-card .dc-tabla-ventas td {
+    text-align: left;
+    padding: 0.2em 0.6em;
+  }
+
+  .dc-tabla-dias tbody th,
+  .dc-card .dc-tabla-ventas td.dc-celda-quitar,
+  .dc-card .dc-tabla-dias td[colspan],
+  .dc-card .dc-tabla-ventas td[colspan] {
+    grid-column: 1 / -1;
   }
 
   /* Movimientos: fecha y tipo arriba, detalle y botón abajo */

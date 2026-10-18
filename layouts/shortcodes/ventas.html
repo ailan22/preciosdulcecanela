@@ -1,0 +1,73 @@
+<div class="dc-card" id="dc-ventas">
+  <p class="dc-estado-recetas" aria-live="polite">Cargando ventas…</p>
+  <form class="dc-clave" hidden>
+    <label>Clave de recetas
+      <input type="password" data-campo="clave" autocomplete="current-password">
+    </label>
+    <button type="submit">Entrar</button>
+  </form>
+
+  <div class="dc-ventas-contenido" hidden>
+    <datalist id="dc-lista-productos"></datalist>
+
+    <form class="dc-venta dc-controles">
+      <label>Fecha
+        <input type="date" name="fecha" required>
+      </label>
+      <label class="dc-ancho">Producto
+        <input type="text" name="producto" list="dc-lista-productos" autocomplete="off" placeholder="Cheesecake" required>
+      </label>
+      <label>Medida
+        <span class="dc-input-sufijo"><input type="number" name="medida" min="1" step="1" value="18"><span>cm</span></span>
+      </label>
+      <label>Cantidad
+        <input type="number" name="cantidad" min="0.1" step="any" value="1" required>
+      </label>
+      <label>Precio c/u
+        <span class="dc-input-prefijo"><span>$</span><input type="number" name="precio" min="0" step="any" required></span>
+      </label>
+      <label class="dc-ancho">Nota
+        <input type="text" name="nota" maxlength="200" placeholder="Cliente, encargo… (opcional)">
+      </label>
+      <div class="dc-ancho"><button type="submit">Registrar venta</button></div>
+    </form>
+    <div class="dc-resultado" aria-live="polite"></div>
+
+    <h3 class="dc-subtitulo">Resumen</h3>
+    <div class="dc-controles dc-filtros">
+      <label>Desde
+        <input type="date" data-campo="desde">
+      </label>
+      <label>Hasta
+        <input type="date" data-campo="hasta">
+      </label>
+    </div>
+    <dl class="dc-resumen">
+      <div><dt>Vendido</dt><dd data-res="total">$0</dd></div>
+      <div><dt>Unidades</dt><dd data-res="unidades">0</dd></div>
+      <div><dt>Costo estimado</dt><dd data-res="costo">$0</dd></div>
+      <div class="dc-destacado"><dt>Ganancia estimada</dt><dd data-res="ganancia">$0</dd></div>
+    </dl>
+    <p class="dc-ayuda" data-aviso-costo></p>
+
+    <h3 class="dc-subtitulo">Por día</h3>
+    <div class="dc-tabla-scroll">
+      <table class="dc-tabla dc-tabla-dias">
+        <thead>
+          <tr><th>Día</th><th class="dc-num">Unidades</th><th class="dc-num">Vendido</th><th class="dc-num">Costo</th><th class="dc-num">Ganancia</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <h3 class="dc-subtitulo">Detalle</h3>
+    <div class="dc-tabla-scroll">
+      <table class="dc-tabla dc-tabla-ventas">
+        <thead>
+          <tr><th>Día</th><th>Producto</th><th class="dc-num">Cant.</th><th class="dc-num">Precio c/u</th><th class="dc-num">Total</th><th class="dc-num">Ganancia</th><th><span class="dc-oculto">Borrar</span></th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>

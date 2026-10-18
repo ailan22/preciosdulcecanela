@@ -3,6 +3,8 @@
 
 PRAGMA foreign_keys = ON;
 
+DROP VIEW IF EXISTS v_ventas_diarias;
+DROP TABLE IF EXISTS ventas;
 DROP VIEW IF EXISTS v_stock;
 DROP TABLE IF EXISTS movimientos_stock;
 DROP TABLE IF EXISTS operaciones_stock;
@@ -135,3 +137,31 @@ FROM insumos i
 JOIN categorias c ON c.id = i.categoria_id
 LEFT JOIN movimientos_stock m ON m.insumo_id = i.id
 GROUP BY i.id;
+
+-- Ventas: fecha es el día local (AAAA-MM-DD). costo_unitario se estima al registrar
+-- con la receta del mismo nombre y los precios de ese momento; NULL si no hay receta.
+CREATE TABLE ventas (
+  id              INTEGER PRIMARY KEY,
+  fecha           TEXT    NOT NULL,
+  producto        TEXT    NOT NULL,
+  medida_cm       REAL,
+  cantidad        REAL    NOT NULL DEFAULT 1 CHECK (cantidad > 0),
+  precio_unitario REAL    NOT NULL CHECK (precio_unitario >= 0),
+  costo_unitario  REAL,
+  receta_id       INTEGER REFERENCES recetas(id) ON DELETE SET NULL,
+  nota            TEXT,
+  creada          TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX ventas_fecha ON ventas(fecha);
+
+-- Totales por día (costo y ganancia solo suman las ventas con costo estimado).
+CREATE VIEW v_ventas_diarias AS
+SELECT
+  fecha,
+  sum(cantidad) AS unidades,
+  sum(cantidad * precio_unitario) AS total,
+  sum(cantidad * costo_unitario) AS costo,
+  sum(cantidad * (precio_unitario - costo_unitario)) AS ganancia
+FROM ventas
+GROUP BY fecha;

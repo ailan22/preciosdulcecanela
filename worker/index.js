@@ -8,6 +8,9 @@
 //   POST   /api/stock/produccion         descuenta los ingredientes de una receta hecha (requiere clave)
 //   POST   /api/stock/ajuste             corrige el stock con lo que se contó (requiere clave)
 //   DELETE /api/stock/operaciones/:id    deshace una operación               (requiere clave)
+//   GET    /api/ventas?desde=&hasta=     ventas y totales por día del período (requiere clave)
+//   POST   /api/ventas                   registra una venta                  (requiere clave)
+//   DELETE /api/ventas/:id               borra una venta                     (requiere clave)
 // La clave se manda en el encabezado X-Clave y se compara con el secreto CLAVE_RECETAS.
 
 const CONSULTA_INSUMOS = `
@@ -256,6 +259,96 @@ async function apiStock(request, env, ruta) {
   return error(404, "No existe");
 }
 
+// ---------- Ventas ----------
+
+const FECHA = /^\d{4}-\d{2}-\d{2}$/;
+
+// Costo de una unidad del producto con la receta del mismo nombre, igual que el calculador:
+// ingredientes escalados por molde + gas/luz/otros % + caja. null si no hay receta.
+async function costoReceta(env, producto, medida) {
+  const receta = await env.DB.prepare(
+    "SELECT id, molde_cm, destino_cm, caja, otros_pct FROM recetas WHERE nombre = ?1"
+  ).bind(producto).first();
+  if (!receta) return { recetaId: null, costo: null };
+
+  const molde = medida > 0 ? medida : receta.destino_cm;
+  const factor = Math.pow(molde / receta.molde_cm, 2);
+  const { results } = await env.DB.prepare(`
+    SELECT ri.cantidad, ri.unidad, ri.paquete, ri.precio,
+           i.unidad AS unidad_insumo, i.cantidad_paquete AS paquete_insumo, i.precio_paquete AS precio_insumo
+    FROM receta_ingredientes ri
+    LEFT JOIN insumos i ON i.id = coalesce(ri.insumo_id, (SELECT id FROM insumos WHERE nombre = ri.nombre))
+    WHERE ri.receta_id = ?1`).bind(receta.id).all();
+
+  let ingredientes = 0;
+  for (const ing of results) {
+    const usa = (ing.cantidad || 0) * factor;
+    // Precio vigente de la lista si coincide la unidad; si no, lo cargado en la receta
+    if (ing.unidad_insumo && ing.unidad_insumo === ing.unidad) ingredientes += (usa / ing.paquete_insumo) * ing.precio_insumo;
+    else if (ing.paquete > 0) ingredientes += (usa / ing.paquete) * (ing.precio || 0);
+  }
+  const costo = ingredientes * (1 + receta.otros_pct / 100) + receta.caja;
+  return { recetaId: receta.id, costo: Math.round(costo * 100) / 100 };
+}
+
+async function verVentas(env, url) {
+  const desde = url.searchParams.get("desde");
+  const hasta = url.searchParams.get("hasta");
+  if (!FECHA.test(desde || "") || !FECHA.test(hasta || "")) return error(400, "Período inválido");
+
+  const [ventas, dias] = await env.DB.batch([
+    env.DB.prepare(`
+      SELECT id, fecha, producto, medida_cm AS medida, cantidad, precio_unitario AS precio,
+             costo_unitario AS costo, nota
+      FROM ventas WHERE fecha BETWEEN ?1 AND ?2 ORDER BY fecha DESC, id DESC`).bind(desde, hasta),
+    env.DB.prepare(
+      "SELECT * FROM v_ventas_diarias WHERE fecha BETWEEN ?1 AND ?2 ORDER BY fecha DESC"
+    ).bind(desde, hasta),
+  ]);
+  return Response.json({ ventas: ventas.results, dias: dias.results });
+}
+
+async function registrarVenta(env, datos) {
+  const fecha = String(datos.fecha || "");
+  const producto = String(datos.producto || "").trim().slice(0, 100);
+  const medida = numero(datos.medida);
+  const cantidadVendida = numero(datos.cantidad) > 0 ? numero(datos.cantidad) : 1;
+  const precio = numero(datos.precio);
+  if (!FECHA.test(fecha)) return error(400, "Fecha inválida");
+  if (!producto) return error(400, "Indicá el producto");
+  if (precio == null || precio < 0) return error(400, "Indicá el precio");
+
+  const { recetaId, costo } = await costoReceta(env, producto, medida);
+  await env.DB.prepare(`
+    INSERT INTO ventas (fecha, producto, medida_cm, cantidad, precio_unitario, costo_unitario, receta_id, nota)
+    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)`
+  ).bind(fecha, producto, medida > 0 ? medida : null, cantidadVendida, precio, costo, recetaId,
+    String(datos.nota || "").trim().slice(0, 200) || null).run();
+
+  return Response.json({
+    mensaje: `Venta registrada: ${formato.format(cantidadVendida)} × ${producto}.` +
+      (costo == null ? " Sin receta guardada con ese nombre, no se calcula la ganancia." : ""),
+  });
+}
+
+async function apiVentas(request, env, ruta, url) {
+  if (!ruta && request.method === "GET") return verVentas(env, url);
+  if (!ruta && request.method === "POST") {
+    let datos;
+    try {
+      datos = await request.json();
+    } catch (e) {
+      return error(400, "Datos inválidos");
+    }
+    return registrarVenta(env, datos || {});
+  }
+  if (/^\d+$/.test(ruta || "") && request.method === "DELETE") {
+    await env.DB.prepare("DELETE FROM ventas WHERE id = ?1").bind(Number(ruta)).run();
+    return new Response(null, { status: 204 });
+  }
+  return error(404, "No existe");
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -267,12 +360,13 @@ export default {
         return Response.json(results, { headers: { "Cache-Control": "no-store" } });
       }
 
-      const privada = url.pathname.match(/^\/api\/(recetas|stock)(?:\/(.+))?$/);
+      const privada = url.pathname.match(/^\/api\/(recetas|stock|ventas)(?:\/(.+))?$/);
       if (privada) {
+        const apis = { recetas: apiRecetas, stock: apiStock, ventas: apiVentas };
         let respuesta;
         if (!env.CLAVE_RECETAS) respuesta = error(503, "Falta configurar la clave de recetas");
         else if (!(await claveValida(request, env))) respuesta = error(401, "Clave incorrecta");
-        else respuesta = await (privada[1] === "recetas" ? apiRecetas : apiStock)(request, env, privada[2]);
+        else respuesta = await apis[privada[1]](request, env, privada[2], url);
         respuesta.headers.set("Cache-Control", "no-store");
         return respuesta;
       }
